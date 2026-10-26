@@ -15,6 +15,8 @@
 :root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0}
 [hidden]{display:none!important}
+html{background:var(--bg)}
+body::after{content:""; position:fixed; left:0; right:0; bottom:0; height:env(safe-area-inset-bottom,0px); background:var(--bg); z-index:20; pointer-events:none}
 /* Layout: registro personale. Su telefono il saldo del mese sta in alto, subito sotto il modulo di inserimento rapido; su desktop il modulo resta fisso a sinistra e a destra scorrono saldo, andamento, categorie e movimenti. */
 :root{
   --bg:#EEF1F4; --surface:#FFFFFF; --ink:#16202A; --muted:#5E6B78; --line:#DCE2E8; --chip:#F1F4F7;
@@ -56,13 +58,13 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .banner{background:var(--out-soft); color:var(--out); border-radius:10px; padding:10px 14px; margin-bottom:16px; font-weight:500}
 
 .grid{display:grid; gap:16px; grid-template-columns:minmax(0,1fr);
-  grid-template-areas:"overview" "form" "trend" "cats" "ledger" "backup"}
+  grid-template-areas:"overview" "form" "accounts" "trend" "cats" "ledger" "backup"}
 @media (min-width:900px){
-  .grid{grid-template-columns:340px minmax(0,1fr); grid-template-areas:"form overview" "form trend" "form cats" "form ledger" "form backup"}
+  .grid{grid-template-columns:340px minmax(0,1fr); grid-template-areas:"form overview" "form accounts" "form trend" "form cats" "form ledger" "form backup"}
   .entry{align-self:start; position:sticky; top:16px}
 }
 .card{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px; min-width:0}
-.overview{grid-area:overview} .entry{grid-area:form} .trend{grid-area:trend} .cats{grid-area:cats} .ledger{grid-area:ledger} .backup{grid-area:backup}
+.overview{grid-area:overview} .accounts{grid-area:accounts} .entry{grid-area:form} .trend{grid-area:trend} .cats{grid-area:cats} .ledger{grid-area:ledger} .backup{grid-area:backup}
 h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:.09em; color:var(--muted); margin:0 0 14px}
 .head{display:flex; justify-content:space-between; align-items:baseline; gap:12px}
 .head .count{font-size:.85rem; color:var(--muted)}
@@ -83,11 +85,11 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 
 /* Inserimento */
 .entry{display:grid; grid-template-columns:minmax(0,1fr); gap:14px}
-.seg{position:relative; display:grid; grid-template-columns:1fr 1fr; gap:3px; background:var(--chip); border-radius:10px; padding:3px}
+.seg{position:relative; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:3px; background:var(--chip); border-radius:10px; padding:3px}
 .seg input{position:absolute; opacity:0; pointer-events:none}
 .seg label{text-align:center; padding:9px 0; border-radius:8px; font-weight:600; cursor:pointer; color:var(--muted)}
 .seg input:checked+label{background:var(--surface); box-shadow:0 1px 2px rgba(0,0,0,.14)}
-#t-out:checked+label{color:var(--out)} #t-in:checked+label{color:var(--in)}
+#t-out:checked+label{color:var(--out)} #t-in:checked+label{color:var(--in)} #t-xfer:checked+label{color:var(--accent)}
 .seg input:focus-visible+label{outline:2px solid var(--accent)}
 .amount-field{display:flex; align-items:baseline; gap:8px; border-bottom:2px solid var(--line); padding-bottom:6px}
 .amount-field:focus-within{border-color:var(--accent)}
@@ -100,13 +102,26 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 .chip{border:1px solid var(--line); background:var(--chip); color:var(--ink); border-radius:999px; padding:7px 12px; font:500 .9rem var(--font-body); cursor:pointer; display:inline-flex; align-items:center; gap:7px}
 .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
 .row2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,.8fr); gap:10px}
-.entry input[type=text],.entry input[type=date]{width:100%; min-width:0; font:16px var(--font-body); color:var(--ink); background:var(--chip); border:1px solid var(--line); border-radius:9px; padding:10px 11px}
+.entry input[type=text],.entry input[type=date],.entry select{width:100%; min-width:0; font:16px var(--font-body); color:var(--ink); background:var(--chip); border:1px solid var(--line); border-radius:9px; padding:10px 11px}
 .submit{border:0; border-radius:11px; background:var(--accent); color:var(--accent-ink); font:600 1rem var(--font-body); padding:13px; cursor:pointer}
 .submit:disabled{opacity:.6; cursor:default}
 #formMsg{margin:0; min-height:1.3em; font-size:.9rem; color:var(--muted)}
 #formMsg.err{color:var(--out)}
 
 .dot{width:10px; height:10px; border-radius:50%; flex:none; display:inline-block}
+
+/* Conti */
+.acctotal{font:700 clamp(1.7rem,5.5vw,2.2rem)/1.1 var(--font-display); font-variant-numeric:tabular-nums; letter-spacing:-.01em; margin:0 0 10px}
+.acclist{list-style:none; margin:0; padding:0}
+.acc{display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:10px 0; border-top:1px solid var(--line)}
+.acclist .acc:first-child{border-top:0}
+.accname{font-weight:600; flex:1 1 8em; min-width:0}
+.accbal{font:650 1rem var(--font-display); font-variant-numeric:tabular-nums; white-space:nowrap}
+.accbal.neg{color:var(--out)}
+.acc input{flex:1 1 9em; min-width:0; font:16px var(--font-body); color:var(--ink); background:var(--chip); border:1px solid var(--line); border-radius:9px; padding:8px 10px}
+.acchint{margin:10px 0 0; color:var(--muted); font-size:.85rem}
+#accMsg{margin:6px 0 0; min-height:1.3em; font-size:.9rem; color:var(--muted)}
+#accMsg.err{color:var(--out)}
 
 /* Andamento */
 .legend{display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:.85rem; color:var(--muted); margin-bottom:10px}
@@ -140,7 +155,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 .rcat{font-weight:500; overflow-wrap:anywhere}
 .rsub{font-size:.82rem; color:var(--muted)}
 .ramt{font:650 1rem var(--font-display); font-variant-numeric:tabular-nums; white-space:nowrap}
-.ramt.in{color:var(--in)} .ramt.out{color:var(--ink)}
+.ramt.in{color:var(--in)} .ramt.out{color:var(--ink)} .ramt.xfer,.ramt.adj{color:var(--muted)}
 .del{border:0; background:transparent; color:var(--muted); font:500 .82rem var(--font-body); padding:6px 8px; border-radius:7px; cursor:pointer}
 .del:hover{background:var(--chip); color:var(--ink)}
 .del.sure{background:var(--out-soft); color:var(--out); font-weight:600}
@@ -211,15 +226,32 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       <p id="sNote"></p>
     </section>
 
+    <section class="card accounts" aria-label="Conti">
+      <div class="head"><h2>Dove sono i soldi</h2><span class="count">Totale</span></div>
+      <div class="acctotal" id="accTotal">0,00 €</div>
+      <ul class="acclist" id="accList"></ul>
+      <p class="acchint">Imposta saldo registra solo la differenza: non conta come entrata né come uscita.</p>
+      <p id="accMsg" role="status"></p>
+    </section>
+
     <form id="form" class="card entry" autocomplete="off">
       <div class="seg" role="radiogroup" aria-label="Tipo di movimento">
         <input type="radio" name="type" id="t-out" value="out" checked><label for="t-out">Uscita</label>
         <input type="radio" name="type" id="t-in" value="in"><label for="t-in">Entrata</label>
+        <input type="radio" name="type" id="t-xfer" value="xfer"><label for="t-xfer">Giroconto</label>
       </div>
       <label class="amount-field" for="amount"><span class="cur">€</span><input id="amount" inputmode="decimal" placeholder="0,00" aria-label="Importo in euro"></label>
-      <div>
+      <div id="catBox">
         <span class="fl" id="catLabel">Categoria</span>
         <div class="chips" id="chips" role="group" aria-labelledby="catLabel"></div>
+      </div>
+      <div id="accBox">
+        <span class="fl" id="accLabel">Conto</span>
+        <div class="chips" id="accChips" role="group" aria-labelledby="accLabel"></div>
+      </div>
+      <div class="row2" id="xferBox" hidden>
+        <div><label class="fl" for="from">Da</label><select id="from"></select></div>
+        <div><label class="fl" for="to">A</label><select id="to"></select></div>
       </div>
       <div class="row2">
         <div><label class="fl" for="note">Nota</label><input type="text" id="note" maxlength="80" placeholder="Es. Esselunga"></div>
@@ -267,11 +299,15 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 <script>
 (function(){
   var CATS = {
-    out: [['Spesa',150],['Casa',215],['Ristoranti',25],['Trasporti',200],['Salute',350],['Sport',130],['Svago',280],['Abbonamenti',255],['Shopping',320],['Investimenti',165],['Altro',230]],
+    out: [['Spesa',150],['Casa',215],['Ristoranti',25],['Trasporti',200],['Salute',350],['Sport',130],['Svago',280],['Abbonamenti',255],['Shopping',320],['Altro',230]],
     in:  [['Stipendio',150],['Extra',40],['Rimborsi',200],['Altro',230]]
   };
   var HUES = {};
   CATS.out.concat(CATS.in).forEach(function(c){ HUES[c[0]] = c[1]; });
+  HUES['Investimenti'] = 165;
+  var ACCOUNTS = [{id:'bcc', name:'BCC'}, {id:'revolut', name:'Revolut'}, {id:'tr', name:'Trade Republic'}];
+  function accOf(id){ return ACCOUNTS.some(function(a){ return a.id === id; }) ? id : ACCOUNTS[0].id; }
+  function accName(id){ return ACCOUNTS.filter(function(a){ return a.id === accOf(id); })[0].name; }
   function color(name){ return 'hsl(' + (HUES[name] != null ? HUES[name] : 230) + ' 55% 50%)'; }
 
   var $ = function(s){ return document.querySelector(s); };
@@ -314,14 +350,40 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   var col = null;
   var curType = 'out';
   var sel = {out: 'Spesa', in: 'Stipendio'};
+  var selAcc = ACCOUNTS[0].id;
+  try { var savedAcc = localStorage.getItem('spese-conto'); if (savedAcc) selAcc = accOf(savedAcc); } catch (e) {}
+  var xf = {from: 'bcc', to: 'tr'};
+  var editAcc = null, editVal = '';
   var confirmId = null;
 
-  function valid(t){ return t && typeof t.date === 'string' && Number.isFinite(t.cents) && (t.type === 'in' || t.type === 'out'); }
+  function valid(t){
+    return t && typeof t.date === 'string' && Number.isFinite(t.cents) &&
+      (t.type === 'in' || t.type === 'out' || t.type === 'xfer' || t.type === 'adj');
+  }
   function byMonth(m){ return tx.filter(function(t){ return valid(t) && t.date.indexOf(m) === 0; }); }
   function totals(list){
     var i = 0, o = 0;
-    list.forEach(function(t){ if (t.type === 'in') i += t.cents; else o += t.cents; });
+    list.forEach(function(t){ if (t.type === 'in') i += t.cents; else if (t.type === 'out') o += t.cents; });
     return {i:i, o:o};
+  }
+  function signedMoney(c){ return (c < 0 ? '−' : '') + money(Math.abs(c)); }
+  function balances(){
+    var b = {};
+    ACCOUNTS.forEach(function(a){ b[a.id] = 0; });
+    tx.forEach(function(t){
+      if (!valid(t)) return;
+      if (t.type === 'in') b[accOf(t.acc)] += t.cents;
+      else if (t.type === 'out') b[accOf(t.acc)] -= t.cents;
+      else if (t.type === 'adj') b[accOf(t.acc)] += t.cents;
+      else { b[accOf(t.from)] -= t.cents; b[accOf(t.to)] += t.cents; }
+    });
+    return b;
+  }
+  function hasMovements(id){
+    return tx.some(function(t){
+      if (!valid(t)) return false;
+      return t.type === 'xfer' ? (accOf(t.from) === id || accOf(t.to) === id) : accOf(t.acc) === id;
+    });
   }
 
   function banner(text){
@@ -397,14 +459,31 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   }
 
   function row(t){
-    var dot = h('span', {class:'dot'}); dot.style.background = color(t.cat);
+    var dot = h('span', {class:'dot'});
+    var title, sub, amt;
+    if (t.type === 'xfer'){
+      dot.style.background = 'hsl(215 15% 55%)';
+      title = t.note || 'Giroconto';
+      sub = accName(t.from) + ' → ' + accName(t.to);
+      amt = money(t.cents);
+    } else if (t.type === 'adj'){
+      dot.style.background = 'hsl(215 15% 55%)';
+      title = t.note || 'Saldo aggiornato';
+      sub = accName(t.acc) + ' · fuori da entrate e uscite';
+      amt = (t.cents > 0 ? '+' : '−') + money(Math.abs(t.cents));
+    } else {
+      dot.style.background = color(t.cat);
+      title = t.note || t.cat;
+      sub = (t.note ? t.cat + ' · ' : '') + accName(t.acc);
+      amt = (t.type === 'in' ? '+' : '−') + money(t.cents);
+    }
     var del = confirmId === t.id
       ? h('button', {type:'button', class:'del sure', text:'Conferma', onclick:function(){ remove(t.id); }})
-      : h('button', {type:'button', class:'del', 'aria-label':'Elimina ' + (t.note || t.cat), text:'Elimina', onclick:function(e){ e.stopPropagation(); confirmId = t.id; renderLedger(); }});
+      : h('button', {type:'button', class:'del', 'aria-label':'Elimina ' + title, text:'Elimina', onclick:function(e){ e.stopPropagation(); confirmId = t.id; renderLedger(); }});
     return h('li', {class:'row'},
       dot,
-      h('div', {class:'rtext'}, h('span', {class:'rcat', text: t.note || t.cat}), t.note ? h('span', {class:'rsub', text:t.cat}) : null),
-      h('span', {class:'ramt ' + t.type, text:(t.type === 'in' ? '+' : '−') + money(t.cents)}),
+      h('div', {class:'rtext'}, h('span', {class:'rcat', text:title}), h('span', {class:'rsub', text:sub})),
+      h('span', {class:'ramt ' + t.type, text:amt}),
       del);
   }
 
@@ -432,25 +511,49 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     });
   }
 
-  function render(){ renderHeader(); renderOverview(); renderTrend(); renderCats(); renderLedger(); }
+  function render(){ renderHeader(); renderOverview(); renderAccounts(); renderTrend(); renderCats(); renderLedger(); }
 
   function renderChips(){
+    var isX = curType === 'xfer';
+    $('#catBox').hidden = isX;
+    $('#accBox').hidden = isX;
+    $('#xferBox').hidden = !isX;
     var box = $('#chips');
     box.replaceChildren();
-    CATS[curType].forEach(function(c){
+    if (!isX) CATS[curType].forEach(function(c){
       var dot = h('span', {class:'dot'}); dot.style.background = color(c[0]);
       box.append(h('button', {type:'button', class:'chip', 'aria-pressed': sel[curType] === c[0] ? 'true' : 'false',
         onclick:function(){ sel[curType] = c[0]; renderChips(); }}, dot, c[0]));
     });
-    $('#submit').textContent = curType === 'out' ? 'Aggiungi uscita' : 'Aggiungi entrata';
+    var ab = $('#accChips');
+    ab.replaceChildren();
+    ACCOUNTS.forEach(function(a){
+      ab.append(h('button', {type:'button', class:'chip', 'aria-pressed': selAcc === a.id ? 'true' : 'false',
+        onclick:function(){ selAcc = a.id; try { localStorage.setItem('spese-conto', a.id); } catch (e) {} renderChips(); }}, a.name));
+    });
+    ['from', 'to'].forEach(function(k){
+      var sl = $('#' + k);
+      sl.replaceChildren();
+      ACCOUNTS.forEach(function(a){
+        var o = h('option', {value:a.id, text:a.name});
+        if (xf[k] === a.id) o.selected = true;
+        sl.append(o);
+      });
+    });
+    $('#submit').textContent = curType === 'out' ? 'Aggiungi uscita' : curType === 'in' ? 'Aggiungi entrata' : 'Aggiungi giroconto';
   }
 
-  function parseCents(s){
+  function parseAny(s){
     s = String(s || '').replace(/\s|€/g, '');
+    if (!s) return null;
     if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
     var n = Number(s);
-    if (!Number.isFinite(n) || n <= 0 || n > 10000000) return 0;
+    if (!Number.isFinite(n) || Math.abs(n) > 10000000) return null;
     return Math.round(n * 100);
+  }
+  function parseCents(s){
+    var c = parseAny(s);
+    return c !== null && c > 0 ? c : 0;
   }
 
   var msgTimer = null;
@@ -481,14 +584,23 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     e.preventDefault();
     var cents = parseCents($('#amount').value);
     if (!cents){ msg('Inserisci un importo maggiore di zero.', true); $('#amount').focus(); return; }
-    var rec = {type:curType, cents:cents, cat:sel[curType], note:$('#note').value.trim(), date:$('#date').value || today, createdAt:Date.now()};
+    var base = {cents:cents, note:$('#note').value.trim(), date:$('#date').value || today, createdAt:Date.now()};
+    var rec;
+    if (curType === 'xfer'){
+      if (xf.from === xf.to){ msg('Scegli due conti diversi.', true); return; }
+      rec = Object.assign({type:'xfer', from:xf.from, to:xf.to, cat:''}, base);
+    } else {
+      rec = Object.assign({type:curType, cat:sel[curType], acc:selAcc}, base);
+    }
     $('#submit').disabled = true;
     try {
       await addTx(rec);
       month = rec.date.slice(0, 7);
       $('#amount').value = '';
       $('#note').value = '';
-      msg('Aggiunta: ' + (rec.type === 'in' ? '+' : '−') + money(cents) + ' · ' + rec.cat, false);
+      msg(rec.type === 'xfer'
+        ? 'Giroconto: ' + money(cents) + ' da ' + accName(rec.from) + ' a ' + accName(rec.to)
+        : 'Aggiunta: ' + (rec.type === 'in' ? '+' : '−') + money(cents) + ' · ' + rec.cat + ' · ' + accName(rec.acc), false);
       render();
       $('#amount').focus();
     } catch (err) {
@@ -536,9 +648,15 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
         tx.forEach(function(t){ have[t.id] = 1; });
         var added = 0;
         arr.forEach(function(t){
-          if (valid(t) && t.cents > 0 && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.cat &&
+          var amtOk = t && (t.type === 'adj' ? t.cents !== 0 : t.cents > 0);
+          var catOk = t && ((t.type === 'in' || t.type === 'out') ? !!t.cat : true);
+          if (valid(t) && amtOk && catOk && /^\d{4}-\d{2}-\d{2}$/.test(t.date) &&
               typeof t.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(t.id) && !have[t.id]){
-            col.doc(t.id).set({type:t.type, cents:t.cents, cat:String(t.cat), note:String(t.note || '').slice(0, 80), date:t.date, createdAt:t.createdAt || 0});
+            var rec = {type:t.type, cents:t.cents, cat:String(t.cat || ''), note:String(t.note || '').slice(0, 80), date:t.date, createdAt:t.createdAt || 0};
+            if (t.acc) rec.acc = accOf(String(t.acc));
+            if (t.from) rec.from = accOf(String(t.from));
+            if (t.to) rec.to = accOf(String(t.to));
+            col.doc(t.id).set(rec);
             have[t.id] = 1; added++;
           }
         });
@@ -550,6 +668,62 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     };
     rd.readAsText(f);
   });
+
+  function accMsg(text, isErr){
+    var m = $('#accMsg');
+    m.textContent = text;
+    m.className = isErr ? 'err' : '';
+  }
+  function renderAccounts(){
+    var bal = balances(), total = 0;
+    ACCOUNTS.forEach(function(a){ total += bal[a.id]; });
+    $('#accTotal').textContent = signedMoney(total);
+    var hadFocus = document.activeElement && document.activeElement.id === 'accInput';
+    var box = $('#accList');
+    box.replaceChildren();
+    ACCOUNTS.forEach(function(a){
+      var li = h('li', {class:'acc'}, h('span', {class:'accname', text:a.name}));
+      if (editAcc === a.id){
+        var inp = h('input', {type:'text', id:'accInput', inputmode:'decimal', autocomplete:'off',
+          placeholder:(bal[a.id] / 100).toFixed(2).replace('.', ','), 'aria-label':'Saldo attuale di ' + a.name});
+        inp.value = editVal;
+        inp.addEventListener('input', function(){ editVal = inp.value; });
+        inp.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); saveBalance(a.id); } });
+        li.append(inp,
+          h('button', {type:'button', class:'btn', text:'Salva', onclick:function(){ saveBalance(a.id); }}),
+          h('button', {type:'button', class:'linkbtn', text:'Annulla', onclick:function(){ editAcc = null; renderAccounts(); }}));
+      } else {
+        li.append(
+          h('span', {class:'accbal' + (bal[a.id] < 0 ? ' neg' : ''), text:signedMoney(bal[a.id])}),
+          h('button', {type:'button', class:'linkbtn', text:'Imposta saldo', 'aria-label':'Imposta il saldo di ' + a.name,
+            onclick:function(){ editAcc = a.id; editVal = ''; accMsg(''); renderAccounts(); var f = $('#accInput'); if (f) f.focus(); }}));
+      }
+      box.append(li);
+    });
+    if (hadFocus){ var f2 = $('#accInput'); if (f2) f2.focus(); }
+  }
+  async function saveBalance(id){
+    var target = parseAny(editVal);
+    if (target === null){ accMsg('Scrivi un importo valido, per esempio 1.250,00.', true); return; }
+    var diff = target - balances()[id];
+    var first = !hasMovements(id);
+    editAcc = null; editVal = '';
+    if (diff === 0){
+      accMsg('Il saldo di ' + accName(id) + ' era già ' + signedMoney(target) + '.', false);
+      renderAccounts();
+      return;
+    }
+    try {
+      await addTx({type:'adj', acc:id, cents:diff, cat:'', note:first ? 'Saldo iniziale' : 'Saldo aggiornato', date:today, createdAt:Date.now()});
+      accMsg('Saldo di ' + accName(id) + ' impostato a ' + signedMoney(target) + '.', false);
+    } catch (e) {
+      accMsg('Non sono riuscito a salvare. Riprova tra poco.', true);
+    }
+    render();
+  }
+  function otherAcc(id){ return ACCOUNTS.filter(function(a){ return a.id !== id; })[0].id; }
+  $('#from').addEventListener('change', function(){ xf.from = this.value; if (xf.to === xf.from) xf.to = otherAcc(xf.from); renderChips(); });
+  $('#to').addEventListener('change', function(){ xf.to = this.value; if (xf.from === xf.to) xf.from = otherAcc(xf.to); renderChips(); });
 
   $('#date').value = today;
   renderChips();
