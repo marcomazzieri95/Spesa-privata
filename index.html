@@ -148,8 +148,16 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 .btns{display:flex; flex-wrap:wrap; gap:10px}
 .btn{border:1px solid var(--line); background:var(--chip); color:var(--ink); font:600 .92rem var(--font-body); padding:10px 14px; border-radius:10px; cursor:pointer}
 .btn:hover{border-color:var(--accent)}
+.linkbtn{background:none; border:0; color:var(--accent); font:600 .9rem var(--font-body); cursor:pointer; padding:4px 0; justify-self:start}
 #backupMsg{margin:10px 0 0; min-height:1.3em; font-size:.9rem; color:var(--muted)}
 #backupMsg.err{color:var(--out)}
+.auth{max-width:420px; margin:4vh auto 0; display:grid; gap:14px}
+.auth h2.t{font:700 1.3rem/1.2 var(--font-display); text-transform:none; letter-spacing:0; color:var(--ink); margin:0}
+.auth .empty{margin:0}
+.authform{display:grid; gap:14px}
+.auth input{width:100%; min-width:0; font:16px var(--font-body); color:var(--ink); background:var(--chip); border:1px solid var(--line); border-radius:9px; padding:10px 11px}
+#authMsg{margin:0; min-height:1.3em; font-size:.9rem; color:var(--muted)}
+#authMsg.err{color:var(--out)}
 @media (max-width:420px){
   .row{grid-template-columns:auto minmax(0,1fr) auto; row-gap:0}
   .del{grid-column:2 / -1; justify-self:start; padding:2px 0}
@@ -165,7 +173,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 <div class="app">
   <header class="top">
     <h1>Le mie spese</h1>
-    <nav class="months" aria-label="Mese">
+    <nav class="months" id="monthsNav" aria-label="Mese" hidden>
       <button type="button" id="prev" aria-label="Mese precedente">‹</button>
       <span id="monthLabel" aria-live="polite"></span>
       <button type="button" id="next" aria-label="Mese successivo">›</button>
@@ -173,6 +181,22 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   </header>
   <div id="banner" class="banner" role="status" hidden></div>
 
+  <p id="boot" class="empty">Un attimo…</p>
+
+  <section id="auth" class="card auth" aria-label="Accesso" hidden>
+    <h2 class="t">Accedi alle tue spese</h2>
+    <p class="empty">Usa la stessa email e la stessa password su telefono e computer: i movimenti si sincronizzano da soli.</p>
+    <form id="authForm" class="authform" novalidate>
+      <div><label class="fl" for="email">Email</label><input type="email" id="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div>
+      <div><label class="fl" for="password">Password</label><input type="password" id="password" autocomplete="current-password"></div>
+      <button class="submit" type="submit" id="loginBtn">Accedi</button>
+      <button class="btn" type="button" id="signupBtn">Crea account (solo la prima volta)</button>
+      <button class="linkbtn" type="button" id="resetBtn">Password dimenticata?</button>
+      <p id="authMsg" role="status"></p>
+    </form>
+  </section>
+
+  <div id="main" hidden>
   <div class="grid">
     <section class="card overview" aria-label="Riepilogo del mese">
       <div>
@@ -224,16 +248,18 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       <div id="ledger"></div>
     </section>
 
-    <section class="card backup" aria-label="Copia di sicurezza">
-      <h2>Copia di sicurezza</h2>
-      <p class="empty">I movimenti restano salvati solo in questo browser, su questo dispositivo. Scarica una copia ogni tanto: ti serve se cambi telefono o cancelli i dati del sito, e per portare i dati dal telefono al computer.</p>
+    <section class="card backup" aria-label="Copia di sicurezza e account">
+      <h2>Copia di sicurezza e account</h2>
+      <p class="empty">I movimenti sono salvati online nel tuo account e si sincronizzano tra i tuoi dispositivi. Ogni tanto scarica comunque una copia: ti serve se cancelli per sbaglio qualcosa.</p>
       <div class="btns">
         <button type="button" class="btn" id="export">Scarica copia</button>
         <button type="button" class="btn" id="importBtn">Ripristina da file</button>
         <input type="file" id="import" accept="application/json,.json" hidden>
       </div>
       <p id="backupMsg" role="status"></p>
+      <p class="empty">Accesso come <b id="who"></b> · <button type="button" class="linkbtn" id="logout">Esci</button></p>
     </section>
+  </div>
   </div>
 </div>
 
@@ -437,13 +463,13 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 
   async function addTx(rec){
     if (col){ await col.doc().set(rec); }
-    else { tx = tx.concat([Object.assign({id:'m' + Date.now() + Math.random().toString(36).slice(2, 6)}, rec)]); persist(); }
+    else { tx = tx.concat([Object.assign({id:'m' + Date.now()}, rec)]); }
   }
   async function remove(id){
     confirmId = null;
     try {
       if (col){ await col.doc(id).delete(); }
-      else { tx = tx.filter(function(t){ return t.id !== id; }); persist(); render(); }
+      else { tx = tx.filter(function(t){ return t.id !== id; }); render(); }
     } catch (e) {
       banner('Non sono riuscito a eliminare il movimento. Riprova tra poco.');
     }
@@ -479,18 +505,6 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     if (confirmId && !e.target.closest('.del')){ confirmId = null; renderLedger(); }
   });
 
-  var LS_KEY = 'le-mie-spese-v1';
-  function persist(){
-    try { localStorage.setItem(LS_KEY, JSON.stringify(tx)); }
-    catch (e) { banner('Il browser non permette di salvare i dati su questo dispositivo.'); }
-  }
-  function loadLocal(){
-    try {
-      var raw = localStorage.getItem(LS_KEY);
-      var arr = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(arr)) tx = arr.filter(valid);
-    } catch (e) { tx = []; }
-  }
   function bmsg(text, isErr){
     var m = $('#backupMsg');
     m.textContent = text;
@@ -513,6 +527,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     var rd = new FileReader();
     rd.onload = function(){
       try {
+        if (!col) throw new Error('accesso');
         var data = JSON.parse(rd.result);
         var arr = Array.isArray(data) ? data : data.movimenti;
         if (!Array.isArray(arr)) throw new Error('formato');
@@ -520,12 +535,12 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
         tx.forEach(function(t){ have[t.id] = 1; });
         var added = 0;
         arr.forEach(function(t){
-          if (valid(t) && t.cents > 0 && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.cat && typeof t.id === 'string' && !have[t.id]){
-            tx.push({id:t.id, type:t.type, cents:t.cents, cat:String(t.cat), note:String(t.note || '').slice(0, 80), date:t.date, createdAt:t.createdAt || 0});
+          if (valid(t) && t.cents > 0 && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.cat &&
+              typeof t.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(t.id) && !have[t.id]){
+            col.doc(t.id).set({type:t.type, cents:t.cents, cat:String(t.cat), note:String(t.note || '').slice(0, 80), date:t.date, createdAt:t.createdAt || 0});
             have[t.id] = 1; added++;
           }
         });
-        persist(); render();
         bmsg('Ripristinati ' + added + (added === 1 ? ' movimento.' : ' movimenti.'), false);
       } catch (e) {
         bmsg('Il file non è una copia valida.', true);
@@ -537,10 +552,141 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 
   $('#date').value = today;
   renderChips();
-  loadLocal();
   render();
 
+  var unsub = null;
+  window.SpeseApp = {
+    start: function(adapter){
+      if (unsub){ unsub(); unsub = null; }
+      col = adapter; tx = []; confirmId = null; banner(''); render();
+      unsub = col.onSnapshot(function(snap){
+        tx = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+        render();
+      }, function(){
+        banner('Non riesco a leggere i movimenti salvati. Controlla la connessione e ricarica la pagina.');
+      });
+    },
+    stop: function(){
+      if (unsub){ unsub(); unsub = null; }
+      col = null; tx = []; confirmId = null; render();
+    },
+    banner: banner
+  };
+  setTimeout(function(){
+    var b = $('#boot');
+    if (b && !b.hidden) b.textContent = 'Sto aspettando il collegamento. Controlla la connessione a internet.';
+  }, 8000);
 })();
+</script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { firebaseConfig } from './firebase-config.js';
+
+const $ = (s) => document.querySelector(s);
+const App = window.SpeseApp;
+
+function authMsg(text, isErr){
+  const m = $('#authMsg');
+  m.textContent = text || '';
+  m.className = isErr ? 'err' : '';
+}
+const ERR = {
+  'auth/invalid-credential': 'Email o password non corretta.',
+  'auth/wrong-password': 'Email o password non corretta.',
+  'auth/user-not-found': 'Non c’è nessun account con questa email. Usa “Crea account”.',
+  'auth/invalid-email': 'L’email non sembra valida.',
+  'auth/email-already-in-use': 'Esiste già un account con questa email: usa “Accedi”.',
+  'auth/weak-password': 'La password è troppo corta: servono almeno 6 caratteri.',
+  'auth/too-many-requests': 'Troppi tentativi. Aspetta qualche minuto e riprova.',
+  'auth/network-request-failed': 'Non riesco a collegarmi. Controlla la connessione.',
+  'auth/operation-not-allowed': 'L’accesso con email non è attivo nel progetto Firebase.'
+};
+const errText = (e) => ERR[e && e.code] || 'Qualcosa non ha funzionato. Riprova tra poco.';
+
+function showBootError(text){
+  const b = $('#boot');
+  b.hidden = false;
+  b.textContent = text;
+}
+
+if (!firebaseConfig || String(firebaseConfig.apiKey || '').indexOf('INCOLLA') === 0) {
+  showBootError('Manca la configurazione di Firebase: compila il file firebase-config.js.');
+} else {
+  let auth, db;
+  try {
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+  } catch (e) {
+    showBootError('Non riesco ad avviare Firebase. Controlla il file firebase-config.js.');
+  }
+
+  if (auth && db) {
+    const adapter = (uid) => {
+      const colRef = collection(db, 'utenti', uid, 'movimenti');
+      const fail = () => App.banner('Non sono riuscito a salvare la modifica. Controlla la connessione e riprova.');
+      return {
+        doc(id) {
+          const ref = id ? doc(colRef, id) : doc(colRef);
+          return {
+            set(data) { setDoc(ref, data).catch(fail); return Promise.resolve(); },
+            delete() { deleteDoc(ref).catch(fail); return Promise.resolve(); }
+          };
+        },
+        onSnapshot(next, err) {
+          return onSnapshot(colRef, (snap) => next({ docs: snap.docs.map((d) => ({ id: d.id, data: () => d.data() })) }), err);
+        }
+      };
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      $('#boot').hidden = true;
+      $('#auth').hidden = !!user;
+      $('#main').hidden = !user;
+      $('#monthsNav').hidden = !user;
+      if (user) {
+        $('#who').textContent = user.email || '';
+        $('#password').value = '';
+        authMsg('');
+        App.start(adapter(user.uid));
+      } else {
+        App.stop();
+      }
+    }, () => showBootError('Non riesco a controllare l’accesso. Ricarica la pagina.'));
+
+    const creds = () => ({ email: $('#email').value.trim(), password: $('#password').value });
+    async function run(kind) {
+      const { email, password } = creds();
+      if (!email || !password) { authMsg('Scrivi email e password.', true); return; }
+      const btns = document.querySelectorAll('#authForm button');
+      btns.forEach((b) => { b.disabled = true; });
+      authMsg('Un attimo…');
+      try {
+        if (kind === 'signup') await createUserWithEmailAndPassword(auth, email, password);
+        else await signInWithEmailAndPassword(auth, email, password);
+      } catch (e) {
+        authMsg(errText(e), true);
+      } finally {
+        btns.forEach((b) => { b.disabled = false; });
+      }
+    }
+    $('#authForm').addEventListener('submit', (e) => { e.preventDefault(); run('login'); });
+    $('#signupBtn').addEventListener('click', () => run('signup'));
+    $('#resetBtn').addEventListener('click', async () => {
+      const { email } = creds();
+      if (!email) { authMsg('Scrivi prima la tua email.', true); return; }
+      try {
+        await sendPasswordResetEmail(auth, email);
+        authMsg('Ti ho mandato un’email per scegliere una nuova password.');
+      } catch (e) {
+        authMsg(errText(e), true);
+      }
+    });
+    $('#logout').addEventListener('click', () => { signOut(auth); });
+  }
+}
 </script>
 </body>
 </html>
