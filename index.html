@@ -299,16 +299,18 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 <script>
 (function(){
   var CATS = {
-    out: [['Spesa',150],['Casa',215],['Ristoranti',25],['Trasporti',200],['Salute',350],['Sport',130],['Svago',280],['Abbonamenti',255],['Shopping',320],['Altro',230]],
+    out: [['Alimentari',150],['Casa',220],['Ristoranti',25],['Salute',355],['Sport',125],['Abbonamenti',245],['Shopping',330],['Giochi online',270],['Bollette',50],['Affitto',175],['Benzina',80],['Auto',200],['Spese rimborsabili',300],['Altro',230]],
     in:  [['Stipendio',150],['Extra',40],['Rimborsi',200],['Altro',230]]
   };
   var HUES = {};
   CATS.out.concat(CATS.in).forEach(function(c){ HUES[c[0]] = c[1]; });
-  HUES['Investimenti'] = 165;
-  var ACCOUNTS = [{id:'bcc', name:'BCC'}, {id:'revolut', name:'Revolut'}, {id:'tr', name:'Trade Republic'}];
-  function accOf(id){ return ACCOUNTS.some(function(a){ return a.id === id; }) ? id : ACCOUNTS[0].id; }
+  HUES['Investimenti'] = 165; HUES['Svago'] = 270; HUES['Trasporti'] = 200;
+  function catName(c){ return c === 'Spesa' ? 'Alimentari' : c; }
+  var ACCOUNTS = [{id:'tr', name:'Trade Republic'}, {id:'bcc', name:'BCC'}, {id:'revolut', name:'Revolut'}, {id:'paypal', name:'PayPal'}];
+  var DEFAULT_ACC = 'tr', LEGACY_ACC = 'bcc';
+  function accOf(id){ return ACCOUNTS.some(function(a){ return a.id === id; }) ? id : LEGACY_ACC; }
   function accName(id){ return ACCOUNTS.filter(function(a){ return a.id === accOf(id); })[0].name; }
-  function color(name){ return 'hsl(' + (HUES[name] != null ? HUES[name] : 230) + ' 55% 50%)'; }
+  function color(name){ var n = catName(name); return 'hsl(' + (HUES[n] != null ? HUES[n] : 230) + ' 55% 50%)'; }
 
   var $ = function(s){ return document.querySelector(s); };
   var eur = new Intl.NumberFormat('it-IT', {style:'currency', currency:'EUR'});
@@ -349,9 +351,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   var tx = [];
   var col = null;
   var curType = 'out';
-  var sel = {out: 'Spesa', in: 'Stipendio'};
-  var selAcc = ACCOUNTS[0].id;
-  try { var savedAcc = localStorage.getItem('spese-conto'); if (savedAcc) selAcc = accOf(savedAcc); } catch (e) {}
+  var sel = {out: 'Alimentari', in: 'Stipendio'};
+  var selAcc = DEFAULT_ACC;
   var xf = {from: 'bcc', to: 'tr'};
   var editAcc = null, editVal = '';
   var confirmId = null;
@@ -440,7 +441,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   function renderCats(){
     var cur = byMonth(month).filter(function(t){ return t.type === 'out'; });
     var sums = {};
-    cur.forEach(function(t){ sums[t.cat] = (sums[t.cat] || 0) + t.cents; });
+    cur.forEach(function(t){ var cn = catName(t.cat); sums[cn] = (sums[cn] || 0) + t.cents; });
     var rows = Object.keys(sums).map(function(k){ return [k, sums[k]]; }).sort(function(a, b){ return b[1] - a[1]; });
     var total = rows.reduce(function(s, r){ return s + r[1]; }, 0);
     var box = $('#catList');
@@ -473,8 +474,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       amt = (t.cents > 0 ? '+' : '−') + money(Math.abs(t.cents));
     } else {
       dot.style.background = color(t.cat);
-      title = t.note || t.cat;
-      sub = (t.note ? t.cat + ' · ' : '') + accName(t.acc);
+      title = t.note || catName(t.cat);
+      sub = (t.note ? catName(t.cat) + ' · ' : '') + accName(t.acc);
       amt = (t.type === 'in' ? '+' : '−') + money(t.cents);
     }
     var del = confirmId === t.id
@@ -529,7 +530,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     ab.replaceChildren();
     ACCOUNTS.forEach(function(a){
       ab.append(h('button', {type:'button', class:'chip', 'aria-pressed': selAcc === a.id ? 'true' : 'false',
-        onclick:function(){ selAcc = a.id; try { localStorage.setItem('spese-conto', a.id); } catch (e) {} renderChips(); }}, a.name));
+        onclick:function(){ selAcc = a.id; renderChips(); }}, a.name));
     });
     ['from', 'to'].forEach(function(k){
       var sl = $('#' + k);
@@ -598,6 +599,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       month = rec.date.slice(0, 7);
       $('#amount').value = '';
       $('#note').value = '';
+      selAcc = DEFAULT_ACC;
+      renderChips();
       msg(rec.type === 'xfer'
         ? 'Giroconto: ' + money(cents) + ' da ' + accName(rec.from) + ' a ' + accName(rec.to)
         : 'Aggiunta: ' + (rec.type === 'in' ? '+' : '−') + money(cents) + ' · ' + rec.cat + ' · ' + accName(rec.acc), false);
