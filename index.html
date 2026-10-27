@@ -230,7 +230,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       <div class="head"><h2>Dove sono i soldi</h2><span class="count">Totale</span></div>
       <div class="acctotal" id="accTotal">0,00 €</div>
       <ul class="acclist" id="accList"></ul>
-      <p class="acchint">Imposta saldo registra solo la differenza: non conta come entrata né come uscita.</p>
+      <p class="acchint">Imposta saldo fissa quanto c’è oggi sul conto e non conta come entrata né come uscita. Una spesa con data precedente non lo cambia.</p>
       <p id="accMsg" role="status"></p>
     </section>
 
@@ -299,7 +299,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 <script>
 (function(){
   var CATS = {
-    out: [['Alimentari',150],['Casa',220],['Ristoranti',25],['Salute',355],['Sport',125],['Abbonamenti',245],['Shopping',330],['Giochi online',270],['Bollette',50],['Affitto',175],['Benzina',80],['Auto',200],['Spese rimborsabili',300],['Altro',230]],
+    out: [['Alimentari',150],['Casa',220],['Ristoranti',25],['Salute',355],['Sport',125],['Abbonamenti',245],['Shopping',330],['Giochi online',270],['Bollette',50],['Affitto',175],['Benzina',80],['Auto',200],['Cura personale',340],['Spese rimborsabili',300],['Altro',230]],
     in:  [['Stipendio',150],['Extra',40],['Rimborsi',200],['Altro',230]]
   };
   var HUES = {};
@@ -368,15 +368,39 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     return {i:i, o:o};
   }
   function signedMoney(c){ return (c < 0 ? '−' : '') + money(Math.abs(c)); }
-  function balances(){
-    var b = {};
-    ACCOUNTS.forEach(function(a){ b[a.id] = 0; });
+  function effect(t, id){
+    if (t.type === 'in') return accOf(t.acc) === id ? t.cents : 0;
+    if (t.type === 'out') return accOf(t.acc) === id ? -t.cents : 0;
+    if (t.type === 'xfer') return (accOf(t.from) === id ? -t.cents : 0) + (accOf(t.to) === id ? t.cents : 0);
+    return 0;
+  }
+  function anchorOf(id){
+    var best = null;
     tx.forEach(function(t){
-      if (!valid(t)) return;
-      if (t.type === 'in') b[accOf(t.acc)] += t.cents;
-      else if (t.type === 'out') b[accOf(t.acc)] -= t.cents;
-      else if (t.type === 'adj') b[accOf(t.acc)] += t.cents;
-      else { b[accOf(t.from)] -= t.cents; b[accOf(t.to)] += t.cents; }
+      if (!valid(t) || t.type !== 'adj' || accOf(t.acc) !== id) return;
+      if (!best || t.date > best.date || (t.date === best.date && (t.createdAt || 0) >= (best.createdAt || 0))) best = t;
+    });
+    return best;
+  }
+  function anchorValue(a, id){
+    if (Number.isFinite(a.bal)) return a.bal;
+    var v = 0;
+    tx.forEach(function(t){
+      if (!valid(t) || (t.createdAt || 0) > (a.createdAt || 0)) return;
+      v += t.type === 'adj' ? (accOf(t.acc) === id ? t.cents : 0) : effect(t, id);
+    });
+    return v;
+  }
+  function balances(){
+    var b = {}, todayStr = ymd(new Date());
+    ACCOUNTS.forEach(function(acc){
+      var id = acc.id, a = anchorOf(id), v = a ? anchorValue(a, id) : 0;
+      tx.forEach(function(t){
+        if (!valid(t) || t.type === 'adj' || t.date > todayStr) return;
+        if (a && !(t.date > a.date || (t.date === a.date && (t.createdAt || 0) > (a.createdAt || 0)))) return;
+        v += effect(t, id);
+      });
+      b[id] = v;
     });
     return b;
   }
@@ -470,8 +494,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     } else if (t.type === 'adj'){
       dot.style.background = 'hsl(215 15% 55%)';
       title = t.note || 'Saldo aggiornato';
-      sub = accName(t.acc) + ' · fuori da entrate e uscite';
-      amt = (t.cents > 0 ? '+' : '−') + money(Math.abs(t.cents));
+      sub = accName(t.acc) + (Number.isFinite(t.bal) ? ' · saldo impostato a ' + signedMoney(t.bal) : ' · fuori da entrate e uscite');
+      amt = t.cents === 0 ? '0,00 €' : (t.cents > 0 ? '+' : '−') + money(Math.abs(t.cents));
     } else {
       dot.style.background = color(t.cat);
       title = t.note || catName(t.cat);
@@ -651,7 +675,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
         tx.forEach(function(t){ have[t.id] = 1; });
         var added = 0;
         arr.forEach(function(t){
-          var amtOk = t && (t.type === 'adj' ? t.cents !== 0 : t.cents > 0);
+          var amtOk = t && (t.type === 'adj' ? (t.cents !== 0 || Number.isFinite(t.bal)) : t.cents > 0);
           var catOk = t && ((t.type === 'in' || t.type === 'out') ? !!t.cat : true);
           if (valid(t) && amtOk && catOk && /^\d{4}-\d{2}-\d{2}$/.test(t.date) &&
               typeof t.id === 'string' && /^[A-Za-z0-9_-]{1,60}$/.test(t.id) && !have[t.id]){
@@ -659,6 +683,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
             if (t.acc) rec.acc = accOf(String(t.acc));
             if (t.from) rec.from = accOf(String(t.from));
             if (t.to) rec.to = accOf(String(t.to));
+            if (t.type === 'adj' && Number.isFinite(t.bal)) rec.bal = t.bal;
             col.doc(t.id).set(rec);
             have[t.id] = 1; added++;
           }
@@ -711,13 +736,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     var diff = target - balances()[id];
     var first = !hasMovements(id);
     editAcc = null; editVal = '';
-    if (diff === 0){
-      accMsg('Il saldo di ' + accName(id) + ' era già ' + signedMoney(target) + '.', false);
-      renderAccounts();
-      return;
-    }
     try {
-      await addTx({type:'adj', acc:id, cents:diff, cat:'', note:first ? 'Saldo iniziale' : 'Saldo aggiornato', date:today, createdAt:Date.now()});
+      await addTx({type:'adj', acc:id, cents:diff, bal:target, cat:'', note:first ? 'Saldo iniziale' : 'Saldo aggiornato', date:today, createdAt:Date.now()});
       accMsg('Saldo di ' + accName(id) + ' impostato a ' + signedMoney(target) + '.', false);
     } catch (e) {
       accMsg('Non sono riuscito a salvare. Riprova tra poco.', true);
