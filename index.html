@@ -126,6 +126,13 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 #accMsg.err{color:var(--out)}
 
 /* Andamento */
+.trend .head{align-items:center; flex-wrap:wrap; margin-bottom:12px}
+.trend .head h2{margin:0}
+.chartnav{display:flex; align-items:center; gap:6px}
+.chartnav button{width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:var(--chip); color:var(--ink); font-size:20px; line-height:1; cursor:pointer}
+.chartnav button:hover:not(:disabled){border-color:var(--accent)}
+.chartnav button:disabled{opacity:.35; cursor:default}
+#crange{font-size:.85rem; color:var(--muted); text-align:center; min-width:11.5em; text-transform:capitalize; font-variant-numeric:tabular-nums}
 .legend{display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:.85rem; color:var(--muted); margin-bottom:10px}
 .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px}
 .legend .sp{margin-left:auto}
@@ -264,8 +271,15 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       <p id="formMsg" role="status"></p>
     </form>
 
-    <section class="card trend" aria-label="Ultimi sei mesi">
-      <h2>Ultimi sei mesi</h2>
+    <section class="card trend" aria-label="Andamento mensile">
+      <div class="head">
+        <h2>Andamento mensile</h2>
+        <div class="chartnav">
+          <button type="button" id="cprev" aria-label="Sei mesi precedenti">‹</button>
+          <span id="crange" aria-live="polite"></span>
+          <button type="button" id="cnext" aria-label="Sei mesi successivi">›</button>
+        </div>
+      </div>
       <div class="legend">
         <span><i style="background:var(--in)"></i>Entrate</span>
         <span><i style="background:var(--out)"></i>Uscite</span>
@@ -359,6 +373,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   var xf = {from: 'bcc', to: 'tr'};
   var editAcc = null, editVal = '';
   var confirmId = null;
+  var chartEnd = curMonth();
 
   function valid(t){
     return t && typeof t.date === 'string' && Number.isFinite(t.cents) &&
@@ -421,6 +436,14 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   }
 
   function curMonth(){ return ymd(new Date()).slice(0, 7); }
+  function ensureVisible(){
+    var cm = curMonth();
+    if (month > chartEnd) chartEnd = month;
+    else if (month < shiftMonth(chartEnd, -5)){
+      var e = shiftMonth(month, 5), cap = month > cm ? month : cm;
+      chartEnd = e > cap ? cap : e;
+    }
+  }
   function renderHeader(){
     $('#monthLabel').textContent = monthName(month, {month:'long', year:'numeric'});
     $('#todayBtn').hidden = month === curMonth();
@@ -449,10 +472,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 
   function renderTrend(){
     var months = [];
-    var end = curMonth();
-    if (month > end) end = month;
-    else if (month < shiftMonth(end, -5)) end = shiftMonth(month, 5);
-    for (var k = 5; k >= 0; k--) months.push(shiftMonth(end, -k));
+    for (var k = 5; k >= 0; k--) months.push(shiftMonth(chartEnd, -k));
     var data = months.map(function(m){ var t = totals(byMonth(m)); return {m:m, i:t.i, o:t.o}; });
     var max = Math.max.apply(null, [1].concat(data.map(function(d){ return d.i; }), data.map(function(d){ return d.o; })));
     var box = $('#bars');
@@ -468,6 +488,9 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       box.append(btn);
     });
     $('#scale').textContent = 'Scala fino a ' + money(max);
+    var ro = {month:'short', year:'numeric'};
+    $('#crange').textContent = monthName(months[0], ro).replace(/\./g, '') + ' – ' + monthName(months[5], ro).replace(/\./g, '');
+    $('#cnext').disabled = chartEnd >= curMonth();
   }
 
   function renderCats(){
@@ -629,6 +652,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     try {
       await addTx(rec);
       month = rec.date.slice(0, 7);
+      ensureVisible();
       $('#amount').value = '';
       $('#note').value = '';
       msg(rec.type === 'xfer'
@@ -645,9 +669,15 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   document.querySelectorAll('input[name="type"]').forEach(function(r){
     r.addEventListener('change', function(){ curType = r.value; renderChips(); });
   });
-  $('#prev').addEventListener('click', function(){ month = shiftMonth(month, -1); confirmId = null; render(); });
-  $('#next').addEventListener('click', function(){ month = shiftMonth(month, 1); confirmId = null; render(); });
-  $('#todayBtn').addEventListener('click', function(){ month = curMonth(); confirmId = null; render(); });
+  $('#prev').addEventListener('click', function(){ month = shiftMonth(month, -1); ensureVisible(); confirmId = null; render(); });
+  $('#next').addEventListener('click', function(){ month = shiftMonth(month, 1); ensureVisible(); confirmId = null; render(); });
+  $('#todayBtn').addEventListener('click', function(){ month = curMonth(); ensureVisible(); confirmId = null; render(); });
+  $('#cprev').addEventListener('click', function(){ chartEnd = shiftMonth(chartEnd, -6); renderTrend(); });
+  $('#cnext').addEventListener('click', function(){
+    var n = shiftMonth(chartEnd, 6), cm = curMonth();
+    chartEnd = n > cm ? (chartEnd < cm ? cm : chartEnd) : n;
+    renderTrend();
+  });
   document.addEventListener('click', function(e){
     if (confirmId && !e.target.closest('.del')){ confirmId = null; renderLedger(); }
   });
