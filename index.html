@@ -52,6 +52,8 @@ h1{font:700 1.6rem/1.1 var(--font-display); margin:0; letter-spacing:-.01em}
 .months{display:flex; align-items:center; gap:4px; background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:3px}
 .months button{width:34px; height:34px; border-radius:50%; border:0; background:transparent; color:var(--ink); font-size:20px; line-height:1; cursor:pointer}
 .months button:hover{background:var(--chip)}
+.months .todaybtn{width:auto; height:34px; padding:0 14px; border-radius:999px; background:var(--accent); color:var(--accent-ink); font:600 .85rem var(--font-body); margin-left:2px}
+.months .todaybtn:hover{background:var(--accent); opacity:.88}
 #monthLabel{min-width:9.5em; text-align:center; font-weight:600; text-transform:capitalize}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
@@ -193,6 +195,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       <button type="button" id="prev" aria-label="Mese precedente">‹</button>
       <span id="monthLabel" aria-live="polite"></span>
       <button type="button" id="next" aria-label="Mese successivo">›</button>
+      <button type="button" id="todayBtn" class="todaybtn" aria-label="Torna al mese corrente" hidden>Oggi</button>
     </nav>
   </header>
   <div id="banner" class="banner" role="status" hidden></div>
@@ -299,7 +302,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 <script>
 (function(){
   var CATS = {
-    out: [['Alimentari',150],['Casa',220],['Ristoranti',25],['Salute',355],['Sport',125],['Abbonamenti',245],['Shopping',330],['Giochi online',270],['Bollette',50],['Affitto',175],['Benzina',80],['Auto',200],['Cura personale',340],['Spese rimborsabili',300],['Altro',230]],
+    out: [['Alimentari',150],['Casa',220],['Ristoranti',25],['Salute',355],['Sport',125],['Abbonamenti',245],['Shopping',330],['Giochi online',270],['Bollette',50],['Affitto',175],['Benzina',80],['Autostrada',105],['Auto',200],['Cura personale',340],['Spese rimborsabili',300],['Altro',230]],
     in:  [['Stipendio',150],['Extra',40],['Rimborsi',200],['Altro',230]]
   };
   var HUES = {};
@@ -417,8 +420,10 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     b.hidden = !text;
   }
 
+  function curMonth(){ return ymd(new Date()).slice(0, 7); }
   function renderHeader(){
     $('#monthLabel').textContent = monthName(month, {month:'long', year:'numeric'});
+    $('#todayBtn').hidden = month === curMonth();
   }
 
   function renderOverview(){
@@ -444,7 +449,10 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 
   function renderTrend(){
     var months = [];
-    for (var k = 5; k >= 0; k--) months.push(shiftMonth(month, -k));
+    var end = curMonth();
+    if (month > end) end = month;
+    else if (month < shiftMonth(end, -5)) end = shiftMonth(month, 5);
+    for (var k = 5; k >= 0; k--) months.push(shiftMonth(end, -k));
     var data = months.map(function(m){ var t = totals(byMonth(m)); return {m:m, i:t.i, o:t.o}; });
     var max = Math.max.apply(null, [1].concat(data.map(function(d){ return d.i; }), data.map(function(d){ return d.o; })));
     var box = $('#bars');
@@ -623,8 +631,6 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
       month = rec.date.slice(0, 7);
       $('#amount').value = '';
       $('#note').value = '';
-      selAcc = DEFAULT_ACC;
-      renderChips();
       msg(rec.type === 'xfer'
         ? 'Giroconto: ' + money(cents) + ' da ' + accName(rec.from) + ' a ' + accName(rec.to)
         : 'Aggiunta: ' + (rec.type === 'in' ? '+' : '−') + money(cents) + ' · ' + rec.cat + ' · ' + accName(rec.acc), false);
@@ -641,6 +647,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   });
   $('#prev').addEventListener('click', function(){ month = shiftMonth(month, -1); confirmId = null; render(); });
   $('#next').addEventListener('click', function(){ month = shiftMonth(month, 1); confirmId = null; render(); });
+  $('#todayBtn').addEventListener('click', function(){ month = curMonth(); confirmId = null; render(); });
   document.addEventListener('click', function(e){
     if (confirmId && !e.target.closest('.del')){ confirmId = null; renderLedger(); }
   });
