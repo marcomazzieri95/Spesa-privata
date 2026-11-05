@@ -167,6 +167,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 .ramt.in{color:var(--in)} .ramt.out{color:var(--ink)} .ramt.xfer,.ramt.adj{color:var(--muted)}
 .del{border:0; background:transparent; color:var(--muted); font:500 .82rem var(--font-body); padding:6px 8px; border-radius:7px; cursor:pointer}
 .del:hover{background:var(--chip); color:var(--ink)}
+.acts{display:flex; align-items:center; gap:2px}
+.editnote{margin:0; padding:8px 10px; border-radius:9px; background:var(--chip); color:var(--ink); font-size:.9rem; font-weight:500}
 .del.sure{background:var(--out-soft); color:var(--out); font-weight:600}
 .empty{margin:0; color:var(--muted)}
 .backup .empty{margin-bottom:12px}
@@ -185,7 +187,8 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
 #authMsg.err{color:var(--out)}
 @media (max-width:420px){
   .row{grid-template-columns:auto minmax(0,1fr) auto; row-gap:0}
-  .del{grid-column:2 / -1; justify-self:start; padding:2px 0}
+  .acts{grid-column:2 / -1; justify-self:start; margin-left:-8px}
+  .del{padding:2px 8px}
   .legend .sp{margin-left:0}
 }
 @media (prefers-reduced-motion:no-preference){
@@ -267,7 +270,9 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
         <div><label class="fl" for="note">Nota</label><input type="text" id="note" maxlength="80" placeholder="Es. Esselunga"></div>
         <div><label class="fl" for="date">Data</label><input type="date" id="date"></div>
       </div>
+      <p class="editnote" id="editNote" role="status" hidden>Stai modificando un movimento già inserito.</p>
       <button class="submit" id="submit" type="submit">Aggiungi uscita</button>
+      <button class="btn" id="cancelEdit" type="button" hidden>Annulla modifica</button>
       <p id="formMsg" role="status"></p>
     </form>
 
@@ -372,6 +377,7 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
   var selAcc = DEFAULT_ACC;
   var xf = {from: 'bcc', to: 'tr'};
   var editAcc = null, editVal = '';
+  var editId = null, editBackup = null;
   var confirmId = null;
   var chartEnd = curMonth();
 
@@ -536,11 +542,13 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     var del = confirmId === t.id
       ? h('button', {type:'button', class:'del sure', text:'Conferma', onclick:function(){ remove(t.id); }})
       : h('button', {type:'button', class:'del', 'aria-label':'Elimina ' + title, text:'Elimina', onclick:function(e){ e.stopPropagation(); confirmId = t.id; renderLedger(); }});
+    var edit = t.type === 'adj' ? null
+      : h('button', {type:'button', class:'del edit', 'aria-label':'Modifica ' + title, text:'Modifica', onclick:function(){ startEdit(t); }});
     return h('li', {class:'row'},
       dot,
       h('div', {class:'rtext'}, h('span', {class:'rcat', text:title}), h('span', {class:'rsub', text:sub})),
       h('span', {class:'ramt ' + t.type, text:amt}),
-      del);
+      h('span', {class:'acts'}, edit, del));
   }
 
   function renderLedger(){
@@ -576,7 +584,9 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     $('#xferBox').hidden = !isX;
     var box = $('#chips');
     box.replaceChildren();
-    if (!isX) CATS[curType].forEach(function(c){
+    var catList = isX ? [] : CATS[curType].slice();
+    if (!isX && sel[curType] && !catList.some(function(c){ return c[0] === sel[curType]; })) catList.push([sel[curType], 230]);
+    if (!isX) catList.forEach(function(c){
       var dot = h('span', {class:'dot'}); dot.style.background = color(c[0]);
       box.append(h('button', {type:'button', class:'chip', 'aria-pressed': sel[curType] === c[0] ? 'true' : 'false',
         onclick:function(){ sel[curType] = c[0]; renderChips(); }}, dot, c[0]));
@@ -596,7 +606,10 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
         sl.append(o);
       });
     });
-    $('#submit').textContent = curType === 'out' ? 'Aggiungi uscita' : curType === 'in' ? 'Aggiungi entrata' : 'Aggiungi giroconto';
+    $('#submit').textContent = editId ? 'Salva modifiche'
+      : curType === 'out' ? 'Aggiungi uscita' : curType === 'in' ? 'Aggiungi entrata' : 'Aggiungi giroconto';
+    $('#editNote').hidden = !editId;
+    $('#cancelEdit').hidden = !editId;
   }
 
   function parseAny(s){
@@ -621,6 +634,37 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     if (text && !isErr) msgTimer = setTimeout(function(){ m.textContent = ''; }, 4500);
   }
 
+  function startEdit(t){
+    confirmId = null;
+    if (!editId) editBackup = {type:curType, o:sel.out, i:sel['in'], acc:selAcc, from:xf.from, to:xf.to};
+    editId = t.id;
+    curType = t.type;
+    var r = document.querySelector('#t-' + t.type); if (r) r.checked = true;
+    if (t.type === 'xfer'){ xf.from = accOf(t.from); xf.to = accOf(t.to); }
+    else { sel[t.type] = catName(t.cat); selAcc = accOf(t.acc); }
+    $('#amount').value = (t.cents / 100).toFixed(2).replace('.', ',');
+    $('#note').value = t.note || '';
+    $('#date').value = t.date;
+    msg('', false);
+    renderChips();
+    renderLedger();
+    var f = $('#form'); if (f.scrollIntoView) f.scrollIntoView({behavior:'smooth', block:'start'});
+    $('#amount').focus();
+  }
+  function endEdit(){
+    if (editBackup){
+      curType = editBackup.type; sel.out = editBackup.o; sel['in'] = editBackup.i;
+      selAcc = editBackup.acc; xf.from = editBackup.from; xf.to = editBackup.to;
+      var r = document.querySelector('#t-' + curType); if (r) r.checked = true;
+    }
+    editId = null; editBackup = null;
+    $('#amount').value = ''; $('#note').value = ''; $('#date').value = today;
+    renderChips();
+  }
+  async function saveEdit(id, rec){
+    if (col){ await col.doc(id).set(rec); }
+    else { tx = tx.map(function(t){ return t.id === id ? Object.assign({id:id}, rec) : t; }); }
+  }
   async function addTx(rec){
     if (col){ await col.doc().set(rec); }
     else { tx = tx.concat([Object.assign({id:'m' + Date.now()}, rec)]); }
@@ -641,6 +685,9 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     var cents = parseCents($('#amount').value);
     if (!cents){ msg('Inserisci un importo maggiore di zero.', true); $('#amount').focus(); return; }
     var base = {cents:cents, note:$('#note').value.trim(), date:$('#date').value || today, createdAt:Date.now()};
+    var wasEdit = !!editId;
+    var editing = wasEdit ? tx.filter(function(t){ return t.id === editId; })[0] : null;
+    if (editing && editing.createdAt) base.createdAt = editing.createdAt;
     var rec;
     if (curType === 'xfer'){
       if (xf.from === xf.to){ msg('Scegli due conti diversi.', true); return; }
@@ -650,22 +697,22 @@ h2{font:600 .78rem/1 var(--font-body); text-transform:uppercase; letter-spacing:
     }
     $('#submit').disabled = true;
     try {
-      await addTx(rec);
+      if (editing) await saveEdit(editId, rec); else await addTx(rec);
       month = rec.date.slice(0, 7);
       ensureVisible();
-      $('#amount').value = '';
-      $('#note').value = '';
-      msg(rec.type === 'xfer'
+      if (wasEdit){ endEdit(); } else { $('#amount').value = ''; $('#note').value = ''; }
+      msg(wasEdit ? 'Modifica salvata.' : rec.type === 'xfer'
         ? 'Giroconto: ' + money(cents) + ' da ' + accName(rec.from) + ' a ' + accName(rec.to)
         : 'Aggiunta: ' + (rec.type === 'in' ? '+' : '−') + money(cents) + ' · ' + rec.cat + ' · ' + accName(rec.acc), false);
       render();
-      $('#amount').focus();
+      if (!wasEdit) $('#amount').focus();
     } catch (err) {
       msg('Non sono riuscito a salvare. Riprova tra poco.', true);
     } finally {
       $('#submit').disabled = false;
     }
   });
+  $('#cancelEdit').addEventListener('click', function(){ endEdit(); msg('', false); });
   document.querySelectorAll('input[name="type"]').forEach(function(r){
     r.addEventListener('change', function(){ curType = r.value; renderChips(); });
   });
